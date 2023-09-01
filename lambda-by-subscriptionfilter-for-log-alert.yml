@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Lambda and SNS definition for alert mail to system opelater
+  "lambda-by-subscriptionfilter-for-log-alert"
+
+Parameters:
+  Env:
+    Type: String
+    Default: "dev"
+    AllowedValues: ["dev", "stg", "prd"]
+  ResourceName:
+    Type: String
+    Default: "log-alert"
+  AccountId:
+    Type: String
+  SnsTopicArn:
+    Type: String
+    Default: ""
+  LogGroupName:
+    Type: String
+    Default: "sample-loggroup-001"
+  FilterPattern:
+    Type: String
+    Default: "ERROR"
+
+Resources:
+  # ------------------------------ #
+  # Lambda
+  # ------------------------------ #
+  Lambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${Env}-lambda-${ResourceName}"
+      Architectures: 
+      - "arm64"
+      MemorySize: 128
+      Role: !GetAtt LambdaRole.Arn
+      Runtime: "Python3.10"
+      Handler: !Sub "${Env}-lambda-${ResourceName}.lambda_handler"
+      Timeout: 60
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref SnsTopicArn
+      Code:
+        S3Bucket: !ImportValue LambdaCodeS3BucketName
+        S3Key: !Sub "${Env}-lambda-${ResourceName}.zip"
+  # ------------------------------ #
+  # Lambda IAM Role
+  # ------------------------------ #
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${Env}-role-lambda-${ResourceName}"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - lambda.amazonaws.com
+            Action:
+            - sts:AssumeRole
+      Policies:
+        - PolicyName: "${Env}-policy-LambdaBasicExecutionRole-${ResourceName}"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Sid: CreateLogGroup
+              Effect: Allow
+              Action: logs:CreateLogGroup
+              Resource: !Sub "arn:aws:logs:ap-northeast-1:${AccountId}:*"
+            - Sid: PutLogEvents
+              Effect: Allow
+              Action: 
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub "arn:aws:logs:ap-northeast-1:${AccountId}:log-group:/aws/lambda/${Env}-lambda-${ResourceName}:*"
+        - PolicyName: "${Env}-policy-snspublish-${ResourceName}"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Sid: Publish
+              Effect: Allow
+              Action: sns:Publish
+              Resource: !Ref SnsTopicArn
+  # ------------------------------ #
+  # CloudWatchLogs SubscriptionFilter
+  # ------------------------------ #
+  CloudWatchLogsSubscriptionFilter:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      FilterName: !Sub "${Env}-subscriptionfilter-${ResourceName}"
+      LogGroupName: !Ref LogGroupName
+      FilterPattern: !Ref FilterPattern
+      DestinationArn: !GetAtt Lambda.Arn
+  # ----- Permission to Lambda ----- #
+  PermissionToLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt Lambda.Arn
+      SourceArn: !Sub "arn:aws:logs:ap-northeast-1:${AccountId}:log-group:/${LogGroupName}:*"
+      Principal: "logs.ap-northeast-1.amazonaws.com"
+      Action: "lambda:InvokeFunction"
