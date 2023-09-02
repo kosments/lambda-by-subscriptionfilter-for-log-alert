@@ -12,7 +12,7 @@ def lambda_handler(event, context):
     compressed_data = base64.b64decode(log_event)
     uncompressed_data = gzip.decompress(compressed_data).decode('utf-8')
     
-    # デコードしたデータをJSONとして解析
+    # デコードしたデータをJSONとしてロード
     log_data = json.loads(uncompressed_data)
     
     # ログメッセージを取得

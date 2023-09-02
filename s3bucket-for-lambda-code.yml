@@ -1,0 +1,30 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: s3bucket-for-lambda-code
+
+Parameters:
+  Prefix:
+    Type: String
+    Default: "dev"
+
+Resources:
+  # ------------------------------ #
+  # S3bucket
+  # ------------------------------ #
+  S3bucketForLambdaCode:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketName: !Sub "${Prefix}-lambda-code-bucket"
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+Outputs:
+  S3BucketNameForLambdaCode:
+    Value: !Ref S3bucketForLambdaCode
+    Export:
+      Name: "S3BucketNameForLambdaCode"

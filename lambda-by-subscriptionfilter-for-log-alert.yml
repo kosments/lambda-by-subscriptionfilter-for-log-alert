@@ -22,6 +22,9 @@ Parameters:
   FilterPattern:
     Type: String
     Default: "ERROR"
+  Runtime:
+    Type: String
+    Default: "python3.10"
 
 Resources:
   # ------------------------------ #
@@ -35,14 +38,14 @@ Resources:
       - "arm64"
       MemorySize: 128
       Role: !GetAtt LambdaRole.Arn
-      Runtime: "Python3.10"
+      Runtime: !Ref Runtime
       Handler: !Sub "${Env}-lambda-${ResourceName}.lambda_handler"
       Timeout: 60
       Environment:
         Variables:
           SNS_TOPIC_ARN: !Ref SnsTopicArn
       Code:
-        S3Bucket: !ImportValue LambdaCodeS3BucketName
+        S3Bucket: !ImportValue S3BucketNameForLambdaCode
         S3Key: !Sub "${Env}-lambda-${ResourceName}.zip"
   # ------------------------------ #
   # Lambda IAM Role
@@ -61,7 +64,7 @@ Resources:
             Action:
             - sts:AssumeRole
       Policies:
-        - PolicyName: "${Env}-policy-LambdaBasicExecutionRole-${ResourceName}"
+        - PolicyName: !Sub "${Env}-policy-LambdaBasicExecutionRole-${ResourceName}"
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -75,7 +78,7 @@ Resources:
                 - logs:CreateLogStream
                 - logs:PutLogEvents
               Resource: !Sub "arn:aws:logs:ap-northeast-1:${AccountId}:log-group:/aws/lambda/${Env}-lambda-${ResourceName}:*"
-        - PolicyName: "${Env}-policy-snspublish-${ResourceName}"
+        - PolicyName: !Sub "${Env}-policy-snspublish-${ResourceName}"
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -98,6 +101,6 @@ Resources:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !GetAtt Lambda.Arn
-      SourceArn: !Sub "arn:aws:logs:ap-northeast-1:${AccountId}:log-group:/${LogGroupName}:*"
+      SourceArn: !Sub "arn:aws:logs:ap-northeast-1:${AccountId}:log-group:${LogGroupName}:*"
       Principal: "logs.ap-northeast-1.amazonaws.com"
       Action: "lambda:InvokeFunction"
